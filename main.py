@@ -25,6 +25,8 @@ kwargs = dict(
     smoothing_steps="nearest",
     time=stc.times,
 )
+print(stc.data.min())
+print(stc.data.max())
 brain.add_data(stc.lh_data, hemi="lh", vertices=stc.lh_vertno, **kwargs)
 brain.add_data(stc.rh_data, hemi="rh", vertices=stc.rh_vertno, **kwargs)
 
