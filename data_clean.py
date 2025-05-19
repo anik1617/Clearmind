@@ -48,27 +48,31 @@ class EEGDataConverter:
         df = pd.read_table(self.input_path, sep='\t', header=None)
         df.columns = self.headers
         
-        # Select only the EEG channels we want
-        df = df[self.columns_to_keep]
-        
-        # Add time column
-        df.insert(0, "Time", np.arange(0, len(df) / 255, 1 / 255))
-        
+        # Extract timestamp column
+        timestamp_col = df["Timestamp"].values
+        start_time = timestamp_col[0]
+        elapsed_time = timestamp_col - start_time  # Time relative to first sample
+
+        # Select only the EEG channels
+        df_eeg = df[self.columns_to_keep].copy()
+
+        # Add time column (based on actual timestamps)
+        df_eeg.insert(0, "Time", elapsed_time)
+
         # Save to CSV
-        df.to_csv(self.output_path, index=False)
-        
-        # Extract time values and EEG data
-        time_val = df.iloc[:, 0].values
-        eeg_data = df.iloc[:, 1:].values.T
-        
+        df_eeg.to_csv(self.output_path, index=False)
+
+        # Return arrays
+        time_val = df_eeg["Time"].values
+        eeg_data = df_eeg.iloc[:, 1:].values.T
+
         print(f"EEG Data Shape: {eeg_data.shape}")
-        
         return time_val, eeg_data
 
-# Example usage:
-if __name__ == "__main__":
-    converter = EEGDataConverter(
-        input_path="./input/DLR_3_1.tsv",
-        output_path="./output/final_EEG.csv"
-    )
-    time_values, eeg_data = converter.convert()
+
+# if __name__ == "__main__":
+#     converter = EEGDataConverter(
+#         input_path="./input/DLR_3_1.tsv",
+#         output_path="./output/final_EEG.csv"
+#     )
+#     time_values, eeg_data = converter.convert()

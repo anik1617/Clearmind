@@ -20,10 +20,7 @@ input_path = "./input/DLR_3_1.tsv"
 output_path = "./output/final_EEG.csv"
 
 # Use EEGDataConverter to process the data
-converter = EEGDataConverter(
-    input_path=input_path,
-    output_path= output_path
-)
+converter = EEGDataConverter(input_path=input_path, output_path=output_path)
 
 time_values, eeg_data = converter.convert()
 
@@ -97,4 +94,5 @@ brain.add_data(stc.lh_data, hemi="lh", vertices=stc.lh_vertno, **kwargs)
 brain.add_data(stc.rh_data, hemi="rh", vertices=stc.rh_vertno, **kwargs)
 
 raw.plot_sensors(kind="topomap", show_names=True)
-input()
+plt.show(block=True)
+brain.show()
