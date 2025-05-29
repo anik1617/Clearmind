@@ -1,0 +1,5 @@
+pandas
+pyttsx3
+pyperclip
+nltk
+g2p_en
