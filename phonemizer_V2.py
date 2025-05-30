@@ -288,8 +288,11 @@ def show_phonemes():
     words_with_punct = re.findall(r'\w+|[^\w\s]|\s+', gpt_output)
     print(f"[TESTT!!] Words: {words_with_punct}")
 
-    words = [w.strip(string.punctuation) for w in gpt_output.split()]
-    words = [w for w in words if w]  # Remove empty strings
+    words = []
+    for w in words_with_punct:
+        if w.strip() and w.strip() not in string.punctuation:
+            words.append(w.strip())
+
     
 
     all_phonemes = []
@@ -301,7 +304,15 @@ def show_phonemes():
         phonemes_for_display.append(ph[0])
         all_phonemes.append(ph[0])
 
-    output_display = '\n'.join([f"{w}: {' '.join(ph_list)}" for w, ph_list in zip(words, phonemes_for_display)])
+    output_display = '\n'.join([
+    f"{w.strip()}: {' '.join(ph_list)}"
+    for w, ph_list in zip(words_with_punct, phonemes_for_display)
+    if ph_list[0] not in ['rand1', 'rand2', 'rand3', 'rand4', 'rand5']
+    and w.strip() not in string.punctuation
+])
+
+
+
     result_label.config(text=f"Phonemes:\n{output_display}")
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
