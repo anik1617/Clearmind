@@ -12,6 +12,7 @@ import threading
 import string
 import pandas as pd
 import pyperclip
+import re
 from dotenv import load_dotenv
 
 from langchain_core.runnables.history import RunnableWithMessageHistory
@@ -218,13 +219,14 @@ ZH - as in 'pleasure'
 
 # Phoneme to number mapping
 phoneme_to_number = {
-    "AA": 1, "AE": 2, "AH": 3, "AO": 4, "AW": 5, "AY": 6,
-    "B": 7, "CH": 8, "D": 9, "DH": 10, "EH": 11, "ER": 12,
-    "EY": 13, "F": 14, "G": 15, "HH": 16, "IH": 17, "IY": 18,
-    "JH": 19, "K": 20, "L": 21, "M": 22, "N": 23, "NG": 24,
-    "OW": 25, "OY": 26, "P": 27, "R": 28, "S": 29, "SH": 30,
-    "T": 31, "TH": 32, "UH": 33, "UW": 34, "V": 35, "W": 36,
-    "Y": 37, "Z": 38, "ZH": 39
+    "AA": 0, "AE": 1, "AH": 2, "AO": 3, "AW": 4, "AY": 5,
+    "B": 6, "CH": 7, "D": 8, "DH": 9, "EH": 10, "ER": 11,
+    "EY": 12, "F": 13, "G": 14, "HH": 15, "IH": 16, "IY": 17,
+    "JH": 18, "K": 19, "L": 20, "M": 21, "N": 22, "NG": 23,
+    "OW": 24, "OY": 25, "P": 26, "R": 27, "S": 28, "SH": 29,
+    "T": 30, "TH": 31, "UH": 32, "UW": 33, "V": 34, "W": 35,
+    "Y": 36, "Z": 37, "ZH": 38, "rand1": 39, "rand2": 40, 
+    "rand3": 41, "rand4": 42, "rand5": 43
 }
 
 # Utility functions
@@ -263,17 +265,28 @@ def ask_larocco_gpt():
 
 
 def get_phonemes_any(word):
+    
     word_lower = word.lower()
-    if word_lower in cmu:
-        return [strip_stress(cmu[word_lower][0])]
+    # print(f"[TESTT!!] Word: {word_lower}")
+    if not ((word_lower == ' ') or (word_lower in string.punctuation)):
+        if word_lower in cmu:
+            return [strip_stress(cmu[word_lower][0])]
+        else:
+            return [strip_stress(g2p(word))]
     else:
-        return [strip_stress(g2p(word))]
+        stuff =  random.choice([["rand1"], ["rand2"], ["rand3"], ["rand4"], ["rand5"]])
+        # print(f"[TESTT!!] Stuff: {stuff}")
+        return stuff
 
 def show_phonemes():
     gpt_output = result_label.cget("text")
     if not gpt_output or gpt_output.startswith("Phonemes:"):
         messagebox.showerror("Error", "No valid GPT response to process.")
         return
+
+
+    words_with_punct = re.findall(r'\w+|[^\w\s]|\s+', gpt_output)
+    print(f"[TESTT!!] Words: {words_with_punct}")
 
     words = [w.strip(string.punctuation) for w in gpt_output.split()]
     words = [w for w in words if w]  # Remove empty strings
@@ -282,7 +295,8 @@ def show_phonemes():
     all_phonemes = []
     phonemes_for_display = []
 
-    for w in words:
+    for w in words_with_punct:
+        # print(f"[TESTT!!] Word: {w}")
         ph = get_phonemes_any(w)
         phonemes_for_display.append(ph[0])
         all_phonemes.append(ph[0])
@@ -310,11 +324,16 @@ def show_phonemes():
 
 
     with open(output_file_path, "w", encoding="utf-8") as word_output:
-        for word_idx, (w, phoneme_list) in enumerate(zip(words, all_phonemes)):
+        for word_idx, (w, phoneme_list) in enumerate(zip(words_with_punct, all_phonemes)):
             print(f"[INFO] Processing word: {w}")
-
-            for p in phoneme_list:
-                num = phoneme_to_number.get(p, -1)
+            if phoneme_list not in ["rand1", "rand2", "rand3", "rand4", "rand5"]:
+                for p in phoneme_list:
+                    num = phoneme_to_number.get(p, -1)
+                    if num == -1:
+                        print(f"[WARNING] Unrecognized phoneme: {p}")
+                        continue
+            else:
+                num = phoneme_to_number.get(phoneme_list, -1)
                 if num == -1:
                     print(f"[WARNING] Unrecognized phoneme: {p}")
                     continue
@@ -331,42 +350,51 @@ def show_phonemes():
                             if first_col == "0.000000":
                                 start_index = idx
                                 break
-
-                        if start_index != -1 and start_index + 256 <= len(lines):
-                            word_output.writelines(lines[start_index:start_index + 256])
+                        if (w != ' '):
+                            # print(f"[TESTT!!] compute for non-spaces: {w}")
+                            if start_index != -1 and start_index + 256 <= len(lines):
+                                word_output.writelines(lines[start_index:start_index + 256])
+                            else:
+                                print(f"[WARNING] Not enough lines after start index {start_index} in file {eeg_file_path}")
                         else:
-                            print(f"[WARNING] Not enough lines after start index {start_index} in file {eeg_file_path}")
+                            # print(f"[TESTT!!] compute for spaces: {w}")
+                            max_row = random.choice([256, 512])
+                            # print(f"[TESTT!!] max_row: {max_row}")
+                            if start_index != -1 and start_index + max_row <= len(lines):
+                                word_output.writelines(lines[start_index:start_index + max_row])
+                            else:
+                                print(f"[WARNING] Not enough lines after start index {start_index} in file {eeg_file_path}")      
 
                 else:
                     msg = f"EEG data not found for phoneme '{p}' (number {num})\n\n"
                     word_output.write(msg)
                     print(f"[ERROR] EEG data not found for phoneme '{p}' (number {num})")
 
-            if word_idx < len(all_phonemes) - 1:
-                random_phoneme = random.choice(list(phoneme_to_number.keys()))
-                random_num = phoneme_to_number[random_phoneme]
-                random_eeg_file = os.path.join(eeg_base_path, f"DLR_{random_num}_1.txt")
+            # if word_idx < len(all_phonemes) - 1:
+            #     random_phoneme = random.choice(list(phoneme_to_number.keys()))
+            #     random_num = phoneme_to_number[random_phoneme]
+            #     random_eeg_file = os.path.join(eeg_base_path, f"DLR_{random_num}_1.txt")
 
-                if os.path.exists(random_eeg_file):
-                    with open(random_eeg_file, "r", encoding="utf-8") as rand_eeg:
-                        rand_lines = rand_eeg.readlines()
+            #     if os.path.exists(random_eeg_file):
+            #         with open(random_eeg_file, "r", encoding="utf-8") as rand_eeg:
+            #             rand_lines = rand_eeg.readlines()
 
-                        # Find the first line where the first column is "0.000000"
-                        start_index = -1
-                        for idx, line in enumerate(rand_lines):
-                            first_col = line.strip().split("\t")[0]
-                            if first_col == "0.000000":
-                                start_index = idx
-                                break
+            #             # Find the first line where the first column is "0.000000"
+            #             start_index = -1
+            #             for idx, line in enumerate(rand_lines):
+            #                 first_col = line.strip().split("\t")[0]
+            #                 if first_col == "0.000000":
+            #                     start_index = idx
+            #                     break
 
-                        if start_index != -1 and start_index + 256 <= len(rand_lines):
-                            word_output.writelines(rand_lines[start_index:start_index + 256])
-                        else:
-                            print(f"[WARNING] Not enough lines after start index {start_index} in file {random_eeg_file}")
-                else:
-                    msg = f"[Pseudorandom Gap: EEG file missing for {random_phoneme} (Num: {random_num})]\n\n"
-                    word_output.write(msg)
-                    print(f"[WARNING] Pseudorandom EEG file missing for {random_phoneme} (Num: {random_num})")
+            #             if start_index != -1 and start_index + 256 <= len(rand_lines):
+            #                 word_output.writelines(rand_lines[start_index:start_index + 256])
+            #             else:
+            #                 print(f"[WARNING] Not enough lines after start index {start_index} in file {random_eeg_file}")
+            #     else:
+            #         msg = f"[Pseudorandom Gap: EEG file missing for {random_phoneme} (Num: {random_num})]\n\n"
+            #         word_output.write(msg)
+            #         print(f"[WARNING] Pseudorandom EEG file missing for {random_phoneme} (Num: {random_num})")
         # Write the same content to .txt file
     with open(txt_output_file_path, "w", encoding="utf-8") as txt_output:
         
