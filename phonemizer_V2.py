@@ -5,6 +5,7 @@ from nltk.corpus import cmudict
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import filedialog
+import customtkinter as ctk
 import pyttsx3
 import random
 import os
@@ -244,21 +245,21 @@ def ask_larocco_gpt():
             config={"configurable": {"session_id": "user_session"}}
         )
 
-        result = response.get("output", "[No output returned]")  # ✅ FIXED
+        result = response.get("output", "[No output returned]")
 
-        result_label.config(text=f"{result}")
+        result_label.configure(text=f"{result}")
 
         # Update conversation log
         log_text.configure(state='normal')
-        log_text.insert(tk.END, f"You: {query}\nLaRoccoGPT: {result}\n\n")
+        log_text.insert("end", f"You: {query}\nLaRoccoGPT: {result}\n\n")
         log_text.configure(state='disabled')
-        log_text.see(tk.END)
+        log_text.see("end")
 
     except Exception as e:
         error_msg = f"[ERROR] Failed to get response:\n{e}"
-        result_label.config(text=error_msg)
+        result_label.configure(text=error_msg)
         log_text.configure(state='normal')
-        log_text.insert(tk.END, f"{error_msg}\n\n")
+        log_text.insert("end", f"{error_msg}\n\n")
         log_text.configure(state='disabled')
 
 
@@ -302,7 +303,7 @@ def show_phonemes():
         all_phonemes.append(ph[0])
 
     output_display = '\n'.join([f"{w}: {' '.join(ph_list)}" for w, ph_list in zip(words, phonemes_for_display)])
-    result_label.config(text=f"Phonemes:\n{output_display}")
+    result_label.configure(text=f"Phonemes:\n{output_display}")
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
     output_folder = os.path.join(base_dir, "eeg_culmination_csv")
@@ -435,7 +436,7 @@ def pronounce_result():
         messagebox.showerror("Error", "No result to pronounce.")
         return
 
-    btn_pronounce.config(state="disabled", text="🔊 Generating...")
+    btn_pronounce.configure(state="disabled", text="🔊 Generating...")
 
     def speak():
         try:
@@ -448,7 +449,7 @@ def pronounce_result():
             tts.save(temp_path)
 
             # Update button before playing
-            root.after(0, lambda: btn_pronounce.config(text="🔊 Playing..."))
+            root.after(0, lambda: btn_pronounce.configure(text="🔊 Playing..."))
 
             # Play sound
             playsound(temp_path)
@@ -463,7 +464,7 @@ def pronounce_result():
                 print(f"[WARNING] Could not delete temp file: {e}")
 
             # Re-enable button
-            root.after(0, lambda: btn_pronounce.config(state="normal", text="🔊 Pronounce"))
+            root.after(0, lambda: btn_pronounce.configure(state="normal", text="🔊 Pronounce"))
 
     threading.Thread(target=speak, daemon=True).start()
 
@@ -511,7 +512,7 @@ def analyze_eeg_input():
                 messagebox.showerror("Error", "No EEG file available. Run 'Get Phonemes' first.")
                 return
 
-            result_label.config(text=f"📥 Loading EEG from: {eeg_path}")
+            result_label.configure(text=f"📥 Loading EEG from: {eeg_path}")
             
             # Step 1: Process EEG
             EEG_Welch_Spectra, TrialCount = EEG_Implement_Welch(eeg_path)
@@ -556,7 +557,7 @@ def analyze_eeg_input():
 
 
             # Now it's safe to overwrite result_label
-            result_label.config(text=f"📥 Loading EEG from: {eeg_path}")
+            result_label.configure(text=f"📥 Loading EEG from: {eeg_path}")
 
             output_dir = f"frames_{choice}_{safe_phrase}"
             os.makedirs(output_dir, exist_ok=True)
@@ -601,82 +602,64 @@ def analyze_eeg_input():
                 print(f"[WARNING] Could not auto-play video: {e}")
 
 
-            result_label.config(text=f"✅ Done! Saved as {video_filename}")
+            result_label.configure(text=f"✅ Done! Saved as {video_filename}")
 
         except Exception as e:
-            result_label.config(text=f"[ERROR] EEG analysis failed:\n{e}")
+            result_label.configure(text=f"[ERROR] EEG analysis failed:\n{e}")
 
     threading.Thread(target=worker).start()
 
 
-def on_enter(e):
-    e.widget['bg'] = "#4a90e2"
-
-def on_leave(e):
-    e.widget['bg'] = "#357ABD"
-
 # GUI Setup
-root = tk.Tk()
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
+
+root = ctk.CTk()
 root.title("🎙️ Phoneme Pronouncer Pro")
 root.geometry(f"{root.winfo_screenwidth()}x{root.winfo_screenheight()-100}")
-root.configure(bg="#1e1e2e")
 root.resizable(False, False)
 
 # Fonts & Colors
 FONT_TITLE = ("Segoe UI", 20, "bold")
 FONT_NORMAL = ("Segoe UI", 12)
 FONT_MONO = ("Courier New", 10)
-FG_COLOR = "#f8f8f2"
-BG_COLOR = "#1e1e2e"
-ENTRY_BG = "#2e2e3e"
-BTN_BG = "#357ABD"
-BTN_FG = "#ffffff"
 
 # Title
-tk.Label(root, text="Phoneme Pronouncer Pro", font=FONT_TITLE, fg="#89ddff", bg=BG_COLOR).pack(pady=20)
+title_label = ctk.CTkLabel(root, text="Phoneme Pronouncer Pro", font=FONT_TITLE, text_color="#89ddff")
+title_label.pack(pady=20)
 
 # Entry Field
-tk.Label(root, text="Type a word or phrase below:", font=FONT_NORMAL, fg=FG_COLOR, bg=BG_COLOR).pack()
-entry = tk.Entry(root, font=("Segoe UI", 14), width=30, bg=ENTRY_BG, fg=FG_COLOR, insertbackground=FG_COLOR, relief="flat")
-entry.pack(ipady=6, pady=10)
+entry_label = ctk.CTkLabel(root, text="Type a word or phrase below:", font=FONT_NORMAL)
+entry_label.pack()
+
+entry = ctk.CTkEntry(root, font=("Segoe UI", 14), width=400, height=40)
+entry.pack(pady=10)
 
 # Buttons
 global btn_pronounce
-btn_frame = tk.Frame(root, bg=BG_COLOR)
+btn_frame = ctk.CTkFrame(root)
 btn_frame.pack(pady=10)
 
-
-btn1 = tk.Button(btn_frame, text="🔍 Get Phonemes", command=show_phonemes, font=FONT_NORMAL, bg=BTN_BG, fg=BTN_FG,
-                 activebackground="#4a90e2", relief="flat", padx=20, pady=8, cursor="hand2")
+btn1 = ctk.CTkButton(btn_frame, text="🔍 Get Phonemes", command=show_phonemes, font=FONT_NORMAL,
+                     width=120, height=35)
 btn1.pack(side="left", padx=10)
-btn1.bind("<Enter>", on_enter)
-btn1.bind("<Leave>", on_leave)
 
-btn2 = tk.Button(btn_frame, text="🔊 Pronounce", command=pronounce_result, font=FONT_NORMAL, bg=BTN_BG, fg=BTN_FG,
-                 activebackground="#4a90e2", relief="flat", padx=20, pady=8, cursor="hand2")
+btn2 = ctk.CTkButton(btn_frame, text="🔊 Pronounce", command=pronounce_result, font=FONT_NORMAL,
+                     width=120, height=35)
 btn2.pack(side="left", padx=10)
 btn_pronounce = btn2
-btn2.bind("<Enter>", on_enter)
-btn2.bind("<Leave>", on_leave)
 
-# New Copy Button
-btn3 = tk.Button(btn_frame, text="📋 Copy Phonemes", command=copy_phonemes, font=FONT_NORMAL, bg=BTN_BG, fg=BTN_FG,
-                 activebackground="#4a90e2", relief="flat", padx=20, pady=8, cursor="hand2")
+btn3 = ctk.CTkButton(btn_frame, text="📋 Copy Phonemes", command=copy_phonemes, font=FONT_NORMAL,
+                     width=120, height=35)
 btn3.pack(side="left", padx=10)
-btn3.bind("<Enter>", on_enter)
-btn3.bind("<Leave>", on_leave)
 
-btn4 = tk.Button(btn_frame, text="🧠 Ask LaRocco", command=ask_larocco_gpt, font=FONT_NORMAL, bg=BTN_BG, fg=BTN_FG,
-                 activebackground="#4a90e2", relief="flat", padx=20, pady=8, cursor="hand2")
+btn4 = ctk.CTkButton(btn_frame, text="🧠 Ask LaRocco", command=ask_larocco_gpt, font=FONT_NORMAL,
+                     width=120, height=35)
 btn4.pack(side="left", padx=10)
-btn4.bind("<Enter>", on_enter)
-btn4.bind("<Leave>", on_leave)
 
-btn5 = tk.Button(btn_frame, text="🧠 Show EEG", command=show_eeg_visualization, font=FONT_NORMAL, bg=BTN_BG, fg=BTN_FG,
-                 activebackground="#4a90e2", relief="flat", padx=20, pady=8, cursor="hand2")
+btn5 = ctk.CTkButton(btn_frame, text="🧠 Show EEG", command=show_eeg_visualization, font=FONT_NORMAL,
+                     width=120, height=35)
 btn5.pack(side="left", padx=10)
-btn5.bind("<Enter>", on_enter)
-btn5.bind("<Leave>", on_leave)
 
 # Variable selection dropdown for neurovascular visualization
 valid_vars = {
@@ -690,46 +673,38 @@ valid_vars = {
     'DeltaLAC': ("ΔLactate", "inferno", (0, 3))
 }
 
-selected_variable = tk.StringVar(value="CMRO2")
-var_dropdown = tk.OptionMenu(btn_frame, selected_variable, *valid_vars.keys())
-var_dropdown.config(font=FONT_NORMAL, bg=BTN_BG, fg=BTN_FG)
+selected_variable = ctk.StringVar(value="CMRO2")
+var_dropdown = ctk.CTkOptionMenu(btn_frame, values=list(valid_vars.keys()), variable=selected_variable,
+                                font=FONT_NORMAL, width=120, height=35)
 var_dropdown.pack(side="left", padx=10)
 
-
-btn5 = tk.Button(btn_frame, text="🧬 Visualize Metabolic Flow", command=analyze_eeg_input, font=FONT_NORMAL, bg=BTN_BG, fg=BTN_FG,
-                 activebackground="#4a90e2", relief="flat", padx=20, pady=8, cursor="hand2")
-btn5.pack(side="left", padx=10)
-btn5.bind("<Enter>", on_enter)
-btn5.bind("<Leave>", on_leave)
-
+btn6 = ctk.CTkButton(btn_frame, text="🧬 Visualize Metabolic Flow", command=analyze_eeg_input, font=FONT_NORMAL,
+                     width=150, height=35)
+btn6.pack(side="left", padx=10)
 
 # Result Label
-result_label = tk.Label(root, text="", wraplength=500, justify="center", font=("Consolas", 13), bg=BG_COLOR, fg="#a6e3a1")
+result_label = ctk.CTkLabel(root, text="", wraplength=500, font=("Consolas", 13), text_color="#a6e3a1")
 result_label.pack(pady=20)
 
 # Log Label
-tk.Label(root, text="📝 Conversation Log", font=("Segoe UI", 14, "bold"), fg="#cba6f7", bg=BG_COLOR).pack(pady=(10, 0))
+log_label = ctk.CTkLabel(root, text="📝 Conversation Log", font=("Segoe UI", 14, "bold"), text_color="#cba6f7")
+log_label.pack(pady=(10, 0))
 
 # Scrollable Text Widget for Log
-log_frame = tk.Frame(root, bg=BG_COLOR)
+log_frame = ctk.CTkFrame(root)
 log_frame.pack(pady=5)
 
-log_scrollbar = tk.Scrollbar(log_frame)
-log_scrollbar.pack(side="right", fill="y")
-
-log_text = tk.Text(log_frame, height=10, width=80, font=("Consolas", 11), bg="#2e2e3e", fg="#cdd6f4",
-                   yscrollcommand=log_scrollbar.set, wrap="word", relief="flat")
-log_text.pack()
-log_scrollbar.config(command=log_text.yview)
+log_text = ctk.CTkTextbox(log_frame, height=200, width=600, font=("Consolas", 11))
+log_text.pack(padx=10, pady=10)
 log_text.configure(state='disabled')
 
-
 # ARPAbet Reference
-tk.Label(root, text="📘 ARPAbet Phoneme Reference", font=("Segoe UI", 14, "bold"), fg="#ffcb6b", bg=BG_COLOR).pack(pady=(10, 0))
+ref_label = ctk.CTkLabel(root, text="📘 ARPAbet Phoneme Reference", font=("Segoe UI", 14, "bold"), text_color="#ffcb6b")
+ref_label.pack(pady=(10, 0))
 
-phoneme_text = tk.Text(root, height=15, width=60, font=FONT_MONO, bg="#2e2e3e", fg=FG_COLOR, bd=0, relief="flat")
+phoneme_text = ctk.CTkTextbox(root, height=300, width=600, font=FONT_MONO)
 phoneme_text.pack(pady=10)
-phoneme_text.insert(tk.END, ARPAbet_PHONEMES)
+phoneme_text.insert("1.0", ARPAbet_PHONEMES)
 phoneme_text.configure(state='disabled')
 
 
