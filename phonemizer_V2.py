@@ -108,6 +108,10 @@ engine.setProperty('volume', 1.0)
 voices = engine.getProperty('voices')
 engine.setProperty('voice', voices[1].id)
 
+global result_label
+global result
+global analyze_window
+
 DATA_FILE = "data/larocco_combined.txt"
 VECTOR_DB_PATH = "vector_db_larocco"
 
@@ -278,9 +282,11 @@ def get_phonemes_any(word):
         stuff =  random.choice([["rand1"], ["rand2"], ["rand3"], ["rand4"], ["rand5"]])
         # print(f"[TESTT!!] Stuff: {stuff}")
         return stuff
+    
+def show_phonemes(analyze_window, analyze_frame,result_label):
 
-def show_phonemes():
     gpt_output = result_label.cget("text")
+    
     if not gpt_output or gpt_output.startswith("Phonemes:"):
         messagebox.showerror("Error", "No valid GPT response to process.")
         return
@@ -371,31 +377,6 @@ def show_phonemes():
                     word_output.write(msg)
                     print(f"[ERROR] EEG data not found for phoneme '{p}' (number {num})")
 
-            # if word_idx < len(all_phonemes) - 1:
-            #     random_phoneme = random.choice(list(phoneme_to_number.keys()))
-            #     random_num = phoneme_to_number[random_phoneme]
-            #     random_eeg_file = os.path.join(eeg_base_path, f"DLR_{random_num}_1.txt")
-
-            #     if os.path.exists(random_eeg_file):
-            #         with open(random_eeg_file, "r", encoding="utf-8") as rand_eeg:
-            #             rand_lines = rand_eeg.readlines()
-
-            #             # Find the first line where the first column is "0.000000"
-            #             start_index = -1
-            #             for idx, line in enumerate(rand_lines):
-            #                 first_col = line.strip().split("\t")[0]
-            #                 if first_col == "0.000000":
-            #                     start_index = idx
-            #                     break
-
-            #             if start_index != -1 and start_index + 256 <= len(rand_lines):
-            #                 word_output.writelines(rand_lines[start_index:start_index + 256])
-            #             else:
-            #                 print(f"[WARNING] Not enough lines after start index {start_index} in file {random_eeg_file}")
-            #     else:
-            #         msg = f"[Pseudorandom Gap: EEG file missing for {random_phoneme} (Num: {random_num})]\n\n"
-            #         word_output.write(msg)
-            #         print(f"[WARNING] Pseudorandom EEG file missing for {random_phoneme} (Num: {random_num})")
         # Write the same content to .txt file
     with open(txt_output_file_path, "w", encoding="utf-8") as txt_output:
         
@@ -418,6 +399,7 @@ def show_phonemes():
         print(f"[INFO] Converted EEG TSV to CSV at: {csv_output_path}")
     except Exception as e:
         print(f"[ERROR] Failed to convert TSV to CSV: {e}")
+    create_analyze_gui(analyze_window, analyze_frame,result_label, gpt_output)
         
 def get_file_path(csv_path):
     """
@@ -608,11 +590,48 @@ def analyze_eeg_input():
             result_label.configure(text=f"[ERROR] EEG analysis failed:\n{e}")
 
     threading.Thread(target=worker).start()
+    
+def create_analyze_gui(analyze_window, analyze_frame,result_label, gpt_output):
+    # Create a frame for the analyze GUI
 
+    analyze_frame.pack(pady=20)
+
+    # Create a label for the analyze GUI   
+    analyze_label = ctk.CTkLabel(analyze_frame, text=f"Analyze: {gpt_output}", font=FONT_TITLE, text_color="#380684")
+    analyze_label.pack(pady=20)
+    
+    # ARPAbet Reference
+    ref_label = ctk.CTkLabel(analyze_frame, text="📘 ARPAbet Phoneme Reference", font=("Segoe UI", 14, "bold"), text_color="#ffcb6b")
+    ref_label.pack(pady=(10, 0))
+
+    # Result Label
+
+    result_label.pack(side="left", padx=10, pady=20)
+
+    phoneme_text = ctk.CTkTextbox(analyze_frame, height=300, width=600, font=FONT_MONO)
+    phoneme_text.pack(pady=10)
+    phoneme_text.insert("1.0", ARPAbet_PHONEMES)
+    phoneme_text.configure(state='disabled')
+
+    
+    
+    analyze_window.mainloop()
+    
+    
+    
+    
+    
+# Create a new window for the analyze GUI
+analyze_window = ctk.CTk()
+analyze_window.title("🧠 Analyze EEG")
+analyze_window.geometry(f"{analyze_window.winfo_screenwidth()}x{analyze_window.winfo_screenheight()-100}")
+analyze_window.resizable(False, False)
+analyze_frame = ctk.CTkFrame(analyze_window)
+result_label = ctk.CTkLabel(analyze_frame, text="", wraplength=500, font=("Consolas", 13), text_color="#a6e3a1")
 
 # GUI Setup
-ctk.set_appearance_mode("dark")
-ctk.set_default_color_theme("blue")
+ctk.set_appearance_mode("light")
+ctk.set_default_color_theme("theme.json")
 
 root = ctk.CTk()
 root.title("🎙️ Phoneme Pronouncer Pro")
@@ -625,8 +644,20 @@ FONT_NORMAL = ("Segoe UI", 12)
 FONT_MONO = ("Courier New", 10)
 
 # Title
-title_label = ctk.CTkLabel(root, text="Phoneme Pronouncer Pro", font=FONT_TITLE, text_color="#89ddff")
+title_label = ctk.CTkLabel(root, text="Phoneme Pronouncer Pro", font=FONT_TITLE, text_color="#380684")
 title_label.pack(pady=20)
+
+# Log Label
+log_label = ctk.CTkLabel(root, text="📝 Conversation Log", font=("Segoe UI", 14, "bold"), text_color="#cba6f7")
+log_label.pack(pady=(10, 0))
+
+# Scrollable Text Widget for Log
+log_frame = ctk.CTkFrame(root)
+log_frame.pack(pady=5)
+
+log_text = ctk.CTkTextbox(log_frame, height=200, width=600, font=("Consolas", 11))
+log_text.pack(padx=10, pady=10)
+log_text.configure(state='disabled')
 
 # Entry Field
 entry_label = ctk.CTkLabel(root, text="Type a word or phrase below:", font=FONT_NORMAL)
@@ -640,7 +671,7 @@ global btn_pronounce
 btn_frame = ctk.CTkFrame(root)
 btn_frame.pack(pady=10)
 
-btn1 = ctk.CTkButton(btn_frame, text="🔍 Get Phonemes", command=show_phonemes, font=FONT_NORMAL,
+btn1 = ctk.CTkButton(btn_frame, text="🔍 Get Phonemes", command=show_phonemes(analyze_window, analyze_frame,result_label), font=FONT_NORMAL,
                      width=120, height=35)
 btn1.pack(side="left", padx=10)
 
@@ -682,30 +713,9 @@ btn6 = ctk.CTkButton(btn_frame, text="🧬 Visualize Metabolic Flow", command=an
                      width=150, height=35)
 btn6.pack(side="left", padx=10)
 
-# Result Label
-result_label = ctk.CTkLabel(root, text="", wraplength=500, font=("Consolas", 13), text_color="#a6e3a1")
-result_label.pack(pady=20)
 
-# Log Label
-log_label = ctk.CTkLabel(root, text="📝 Conversation Log", font=("Segoe UI", 14, "bold"), text_color="#cba6f7")
-log_label.pack(pady=(10, 0))
 
-# Scrollable Text Widget for Log
-log_frame = ctk.CTkFrame(root)
-log_frame.pack(pady=5)
 
-log_text = ctk.CTkTextbox(log_frame, height=200, width=600, font=("Consolas", 11))
-log_text.pack(padx=10, pady=10)
-log_text.configure(state='disabled')
-
-# ARPAbet Reference
-ref_label = ctk.CTkLabel(root, text="📘 ARPAbet Phoneme Reference", font=("Segoe UI", 14, "bold"), text_color="#ffcb6b")
-ref_label.pack(pady=(10, 0))
-
-phoneme_text = ctk.CTkTextbox(root, height=300, width=600, font=FONT_MONO)
-phoneme_text.pack(pady=10)
-phoneme_text.insert("1.0", ARPAbet_PHONEMES)
-phoneme_text.configure(state='disabled')
 
 
 def convert_eeg_tsv_to_csv(input_tsv_path: str, output_csv_path: str):
