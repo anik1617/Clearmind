@@ -72,7 +72,7 @@ class EEGVisualizer:
         brain = mne.viz.Brain(subject, subjects_dir=self.subjects_dir, **brain_kwargs)
 
         # Crop and prepare data for visualization
-        stc.crop(0.05, 0.5)
+        stc.crop(0.5, 3.55)
         kwargs = dict(
             fmin=stc.data.min(),
             fmax=stc.data.max(),
@@ -84,11 +84,16 @@ class EEGVisualizer:
         # Add data to brain visualization
         brain.add_data(stc.lh_data, hemi="lh", vertices=stc.lh_vertno, **kwargs)
         brain.add_data(stc.rh_data, hemi="rh", vertices=stc.rh_vertno, **kwargs)
-
         
-        raw.plot_sensors(kind="topomap", show_names=True)
+        new_cam = [
+            (300, 300, 200),    # camera XYZ location (move farther “out” and “up”)
+            (0, 0, 0),          # focal point (center of the brain)
+            (0, 0, 1)           # “up” direction: +Y axis
+        ]
+        brain.plotter.camera_position = new_cam
+        
+        brain.save_movie("dspm_movie.mp4", framerate=30)
         plt.show(block=True)
-        brain.show()
 
 
 def launch_in_subprocess(csv_path: str):

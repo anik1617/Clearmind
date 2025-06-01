@@ -16,11 +16,11 @@
     "border_width": 0,
     "fg_color": [
       "#fcf4e4",
-      "gray17"
+      "#fcf4e4"
     ],
     "top_fg_color": [
-      "gray81",
-      "gray20"
+      "#fcf4e4",
+      "#fcf4e4"
     ],
     "border_color": [
       "gray65",

@@ -15,6 +15,7 @@ import pandas as pd
 import pyperclip
 import re
 from dotenv import load_dotenv
+from video_player import CustomVideoPlayer
 
 from langchain_core.runnables.history import RunnableWithMessageHistory
 
@@ -36,6 +37,7 @@ from playsound import playsound
 import tempfile
 import sys
 import os
+import vlc
 
 from langchain_core.runnables import RunnableLambda
 
@@ -45,10 +47,12 @@ from EEG_normalizedGamma_CMRO2 import plot_normalized_gamma_across_channels
 from EEG_NeurovascularVariables import calculate_neurovascular_variables
 from EEG_Plotting import EEG_Plotting
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
+from tkvideo import tkvideo
 import matplotlib.pyplot as plt
 import webbrowser
 
 from visualizer import EEGVisualizer
+
 
 
 # Tell Python to look in the EEG folder
@@ -61,6 +65,7 @@ from EEG_Plotting import EEG_Plotting
 
 last_generated_eeg_path = None  # Holds most recent phoneme EEG file
 
+video_label = None
 
 # Load .env
 load_dotenv()
@@ -286,6 +291,7 @@ def get_phonemes_any(word):
 def show_phonemes(analyze_window, analyze_frame,result_label):
 
     gpt_output = result_label.cget("text")
+    # gpt_output = "Hey what's up?"
     
     if not gpt_output or gpt_output.startswith("Phonemes:"):
         messagebox.showerror("Error", "No valid GPT response to process.")
@@ -484,7 +490,7 @@ def show_eeg_visualization():
     launch_in_subprocess(csv_output_path)
 
 
-def analyze_eeg_input():
+def analyze_eeg_input(selected_variable):
     def worker():
         try:
             global last_generated_eeg_path
@@ -579,7 +585,7 @@ def analyze_eeg_input():
 
 # Auto-play the video after saving
             try:
-                os.startfile(video_filename) 
+                embed_video(video_filename, frame_delay_ms=1000)
             except Exception as e:
                 print(f"[WARNING] Could not auto-play video: {e}")
 
@@ -590,48 +596,201 @@ def analyze_eeg_input():
             result_label.configure(text=f"[ERROR] EEG analysis failed:\n{e}")
 
     threading.Thread(target=worker).start()
+ 
+def embed_video(video_path, frame_delay_ms=1000):
+    """
+    Starts playing `video_path` inside the global `video_label`.
+    - frame_delay_ms: how many milliseconds between frames (100 ms ≈ 10 FPS).
+    """
+    global video_label
+    if video_label is None:
+        # If the placeholder doesn’t exist yet, nothing to do.
+        return
+
+    # If you want to stop an existing player first, store it in a global.
+    global _CURRENT_VIDEO_PLAYER
+    try:
+        # If a previous instance was running, stop it and release resources
+        _CURRENT_VIDEO_PLAYER.stop()
+    except Exception:
+        pass
+
+    # Create a new player and begin
+    player = CustomVideoPlayer(
+        video_path=video_path,
+        label_widget=video_label,
+        frame_delay_ms=frame_delay_ms,
+        loop=False,        # set loop=True if you want to replay automatically
+        width=640,
+        height=360
+    )
+    _CURRENT_VIDEO_PLAYER = player
+    player.play()
     
 def create_analyze_gui(analyze_window, analyze_frame,result_label, gpt_output):
-    # Create a frame for the analyze GUI
 
-    analyze_frame.pack(pady=20)
+    # 1) Make sure analyze_frame appears in analyze_window, centered with some padding:
+    analyze_frame.pack(padx=20, pady=20, fill="both", expand=False)
 
-    # Create a label for the analyze GUI   
-    analyze_label = ctk.CTkLabel(analyze_frame, text=f"Analyze: {gpt_output}", font=FONT_TITLE, text_color="#380684")
-    analyze_label.pack(pady=20)
-    
-    # ARPAbet Reference
-    ref_label = ctk.CTkLabel(analyze_frame, text="📘 ARPAbet Phoneme Reference", font=("Segoe UI", 14, "bold"), text_color="#ffcb6b")
-    ref_label.pack(pady=(10, 0))
+    # 2) Configure analyze_frame so that column 0 expands and always stays centered:
+    analyze_frame.grid_columnconfigure(0, weight=1)
 
-    # Result Label
+    # 3) "Analyze:" header label (row 0), centered:
+    analyze_label = ctk.CTkLabel(
+        analyze_frame,
+        text=f"Analyze: \"{gpt_output}\"",
+        font=FONT_TITLE,
+        text_color="#380684"
+    )
+    analyze_label.grid(row=0, column=0, pady=(0, 20), sticky="n")
 
-    result_label.pack(side="left", padx=10, pady=20)
+    # 5) result_label (row 2), centered. (It shows the "Phonemes:\n…" text.)
+    result_label.grid(row=1, column=0, pady=(0, 10), sticky="n")
 
-    phoneme_text = ctk.CTkTextbox(analyze_frame, height=300, width=600, font=FONT_MONO)
-    phoneme_text.pack(pady=10)
+    # 4) ARPAbet Reference label (row 1), centered under the header:
+    ref_label = ctk.CTkLabel(
+        analyze_frame,
+        text="📘 ARPAbet Phoneme Reference",
+        font=("Segoe UI", 14, "bold"),
+        text_color="#ffcb6b"
+    )
+    ref_label.grid(row=2, column=0, pady=(0, 10), sticky="n")
+
+
+    # 6) The phoneme_text box (row 3), centered with a fixed size:
+    phoneme_text = ctk.CTkTextbox(
+        analyze_frame,
+        height=300,
+        width=600,
+        font=FONT_MONO
+    )
     phoneme_text.insert("1.0", ARPAbet_PHONEMES)
-    phoneme_text.configure(state='disabled')
+    phoneme_text.configure(state="disabled")
+    phoneme_text.grid(row=3, column=0, pady=(0, 20), sticky="n")
+
+    # 7) Create a button‐container frame (btn_frame) at row 4, centered:
+    btn_frame = ctk.CTkFrame(analyze_frame)
+    btn_frame.grid(row=4, column=0, pady=(0, 20), sticky="n")
+
+    #    Tell btn_frame to distribute its columns evenly (so children remain symmetrical)
+    #    We'll have 5 columns in btn_frame: Pronounce, Copy, Show EEG, Dropdown, Visualize.
+    for col_index in range(5):
+        btn_frame.grid_columnconfigure(col_index, weight=1, uniform="btn_col")
+
+    # 7a) "🔊 Pronounce" button in btn_frame (column 0)
+    btn2 = ctk.CTkButton(
+        btn_frame,
+        text="🔊 Pronounce",
+        command=pronounce_result,
+        font=FONT_NORMAL,
+        width=120,
+        height=35
+    )
+    btn2.grid(row=0, column=0, padx=5)
+
+    # 7b) "📋 Copy Phonemes" button in btn_frame (column 1)
+    btn3 = ctk.CTkButton(
+        btn_frame,
+        text="📋 Copy Phonemes",
+        command=copy_phonemes,
+        font=FONT_NORMAL,
+        width=120,
+        height=35
+    )
+    btn3.grid(row=0, column=1, padx=5)
+
+    # 7c) "🧠 Show EEG" button in btn_frame (column 2)
+    btn5 = ctk.CTkButton(
+        btn_frame,
+        text="🧠 Show EEG",
+        command=show_eeg_visualization,
+        font=FONT_NORMAL,
+        width=120,
+        height=35
+    )
+    btn5.grid(row=0, column=2, padx=5)
+
+    # 7d) Dropdown for variable selection in btn_frame (column 3)
+    valid_vars = {
+        'CBF': ("CBF Level (ml/100g/min)", "plasma", (20, 90)),
+        'OEF': ("OEF Level", "viridis", (0.2, 0.6)),
+        'ph_V': ("pH Value", "cividis", (6.5, 7.4)),
+        'p_CO2_V': ("Partial CO₂ Pressure (mmHg)", "coolwarm", (30, 50)),
+        'pO2_cap': ("Capillary pO₂ (mmHg)", "cool", (50, 60)),
+        'CMRO2': ("CMRO₂ Level", "hot", (2.0, 10.0)),
+        'DeltaHCO2': ("ΔHCO₂", "magma", (4, 5)),
+        'DeltaLAC': ("ΔLactate", "inferno", (0, 3))
+    }
+    selected_variable = ctk.StringVar(value="CMRO2")
+
+    var_dropdown = ctk.CTkOptionMenu(
+        btn_frame,
+        values=list(valid_vars.keys()),
+        variable=selected_variable,
+        font=FONT_NORMAL,
+        width=120,
+        height=35
+    )
+    var_dropdown.grid(row=0, column=3, padx=5)
+
+    # 7e) "🧬 Visualize Metabolic Flow" button in btn_frame (column 4)
+    btn6 = ctk.CTkButton(
+        btn_frame,
+        text="🧬 Visualize Metabolic Flow",
+        command=lambda: analyze_eeg_input(selected_variable),
+        font=FONT_NORMAL,
+        width=150,
+        height=35
+    )
+    btn6.grid(row=0, column=4, padx=5)
+    
+    global video_label
+    
+    video_frame = ctk.CTkFrame(
+        analyze_frame,
+        width=640,
+        height=360,
+        fg_color="#000000"
+    )
+    video_frame.grid(row=5, column=0, pady=(0, 20), sticky="n")
+    video_frame.grid_propagate(False)  # Prevent auto-resizing
+    
+    video_label = tk.Label(
+        video_frame,
+        text="Video will appear here",
+        bg="black",
+        fg="white",
+        width=80,
+        height=20,
+        font=("Segoe UI", 14)
+    )
+    video_label.place(relx=0, rely=0, relwidth=1, relheight=1)
+
+
+    # Everything is now laid out: analyze_frame is packed, and its children are centered via grid(...)
+    analyze_window.mainloop()
 
     
     
-    analyze_window.mainloop()
     
-    
-    
-    
+# GUI Setup
+ctk.set_appearance_mode("light")
+ctk.set_default_color_theme("theme.json")    
     
 # Create a new window for the analyze GUI
 analyze_window = ctk.CTk()
 analyze_window.title("🧠 Analyze EEG")
 analyze_window.geometry(f"{analyze_window.winfo_screenwidth()}x{analyze_window.winfo_screenheight()-100}")
 analyze_window.resizable(False, False)
-analyze_frame = ctk.CTkFrame(analyze_window)
-result_label = ctk.CTkLabel(analyze_frame, text="", wraplength=500, font=("Consolas", 13), text_color="#a6e3a1")
+analyze_frame = ctk.CTkScrollableFrame(
+    analyze_window,
+    width=analyze_window.winfo_screenwidth(),
+    height=analyze_window.winfo_screenheight() - 100,
+    fg_color="transparent"
+)
+result_label = ctk.CTkLabel(analyze_frame, text="", wraplength=500, font=("Consolas", 13), text_color="#000000")
 
-# GUI Setup
-ctk.set_appearance_mode("light")
-ctk.set_default_color_theme("theme.json")
+
 
 root = ctk.CTk()
 root.title("🎙️ Phoneme Pronouncer Pro")
@@ -671,47 +830,15 @@ global btn_pronounce
 btn_frame = ctk.CTkFrame(root)
 btn_frame.pack(pady=10)
 
-btn1 = ctk.CTkButton(btn_frame, text="🔍 Get Phonemes", command=show_phonemes(analyze_window, analyze_frame,result_label), font=FONT_NORMAL,
+btn1 = ctk.CTkButton(btn_frame, text="🔍 Get Phonemes", command=lambda: show_phonemes(analyze_window, analyze_frame,result_label), font=FONT_NORMAL,
                      width=120, height=35)
 btn1.pack(side="left", padx=10)
 
-btn2 = ctk.CTkButton(btn_frame, text="🔊 Pronounce", command=pronounce_result, font=FONT_NORMAL,
-                     width=120, height=35)
-btn2.pack(side="left", padx=10)
-btn_pronounce = btn2
-
-btn3 = ctk.CTkButton(btn_frame, text="📋 Copy Phonemes", command=copy_phonemes, font=FONT_NORMAL,
-                     width=120, height=35)
-btn3.pack(side="left", padx=10)
 
 btn4 = ctk.CTkButton(btn_frame, text="🧠 Ask LaRocco", command=ask_larocco_gpt, font=FONT_NORMAL,
                      width=120, height=35)
 btn4.pack(side="left", padx=10)
 
-btn5 = ctk.CTkButton(btn_frame, text="🧠 Show EEG", command=show_eeg_visualization, font=FONT_NORMAL,
-                     width=120, height=35)
-btn5.pack(side="left", padx=10)
-
-# Variable selection dropdown for neurovascular visualization
-valid_vars = {
-    'CBF': ("CBF Level (ml/100g/min)", "plasma", (20, 90)),
-    'OEF': ("OEF Level", "viridis", (0.2, 0.6)),
-    'ph_V': ("pH Value", "cividis", (6.5, 7.4)),
-    'p_CO2_V': ("Partial CO₂ Pressure (mmHg)", "coolwarm", (30, 50)),
-    'pO2_cap': ("Capillary pO₂ (mmHg)", "cool", (50, 60)),
-    'CMRO2': ("CMRO₂ Level", "hot", (2.0, 10.0)),
-    'DeltaHCO2': ("ΔHCO₂", "magma", (4, 5)),
-    'DeltaLAC': ("ΔLactate", "inferno", (0, 3))
-}
-
-selected_variable = ctk.StringVar(value="CMRO2")
-var_dropdown = ctk.CTkOptionMenu(btn_frame, values=list(valid_vars.keys()), variable=selected_variable,
-                                font=FONT_NORMAL, width=120, height=35)
-var_dropdown.pack(side="left", padx=10)
-
-btn6 = ctk.CTkButton(btn_frame, text="🧬 Visualize Metabolic Flow", command=analyze_eeg_input, font=FONT_NORMAL,
-                     width=150, height=35)
-btn6.pack(side="left", padx=10)
 
 
 
@@ -748,7 +875,6 @@ def convert_eeg_tsv_to_csv(input_tsv_path: str, output_csv_path: str):
     df_eeg.insert(1, "Timestamp", time_col)
 
     df_eeg.to_csv(output_csv_path, index=False)
-
 
 
 # Run Application
